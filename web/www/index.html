@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>kev console — decision model test</title>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --panel2:#1c2333; --border:#2d3648;
+    --fg:#e6edf3; --dim:#8b98ab; --acc:#58a6ff; --ok:#3fb950; --war:#d29922; --pur:#a371f7;
+    --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"PingFang SC",sans-serif}
+  header{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--panel)}
+  header h1{font-size:15px;margin:0;letter-spacing:.3px}
+  header h1 .dot{color:var(--ok)}
+  .badge{font:12px var(--mono);color:var(--dim);background:var(--panel2);border:1px solid var(--border);padding:3px 8px;border-radius:6px}
+  .main{display:grid;grid-template-columns:300px minmax(340px,1fr) minmax(340px,1fr);gap:16px;padding:16px 20px;align-items:start}
+  @media(max-width:1200px){.main{grid-template-columns:1fr 1fr}}
+  @media(max-width:820px){.main{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--dim);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+  .panel h2 .hint{font-size:11px;text-transform:none;letter-spacing:0;opacity:.7;font-weight:400}
+  label{display:block;font-size:12px;color:var(--dim);margin:8px 0 4px}
+  textarea,input,select{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--fg);border-radius:6px;padding:7px 9px;font:13px var(--mono)}
+  textarea:focus,input:focus,select:focus{outline:none;border-color:var(--acc)}
+  .row{display:flex;gap:8px;align-items:center}
+  .row>*{flex:1}
+  .qcard{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px}
+  .qcard .qhead{display:flex;gap:8px;margin-bottom:6px}
+  .qcard .qhead input{flex:2}
+  .qcard .qhead select{flex:1}
+  .btn{background:var(--acc);color:#0d1117;border:0;border-radius:6px;padding:8px 16px;font-weight:600;cursor:pointer;font-size:13px}
+  .btn:hover{filter:brightness(1.1)}
+  .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--dim);padding:5px 10px;font-weight:400}
+  .btn.danger{background:transparent;border:1px solid var(--border);color:#f47067;padding:4px 9px;font-weight:400}
+  .btn:disabled{opacity:.5;cursor:wait}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-top:12px}
+  .status{font:12px var(--mono);color:var(--dim)}
+  .status.ok{color:var(--ok)} .status.err{color:#f47067}
+  .anscard{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--panel2)}
+  .anscard .id{font-family:var(--mono);font-size:12px;color:var(--acc)}
+  .anscard .kv{font:12px var(--mono);color:var(--fg);margin:2px 0}
+  .anscard .kv b{color:var(--dim);font-weight:400}
+  .bar{display:flex;align-items:center;gap:8px;font:12px var(--mono);margin:3px 0}
+  .bar .name{width:130px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:none}
+  .bar .track{flex:1;background:var(--border);border-radius:4px;height:12px;overflow:hidden}
+  .bar .fill{height:100%;background:linear-gradient(90deg,#1f6feb,#58a6ff);border-radius:4px}
+  .bar .pct{width:52px;text-align:right;color:var(--fg);flex:none}
+  .topline{font:12px var(--mono);color:var(--dim);border-bottom:1px solid var(--border);padding-bottom:8px;margin-bottom:10px}
+  #running{display:none;color:var(--war);font:12px var(--mono);margin-top:8px}
+  .lang{display:flex;gap:2px;margin-left:auto;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .lang button{background:transparent;border:0;color:var(--dim);padding:4px 12px;cursor:pointer;font-size:12px}
+  .lang button.on{background:var(--acc);color:#0d1117;font-weight:600}
+  .tpl{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:8px;cursor:pointer}
+  .tpl:hover{border-color:var(--acc)}
+  .tpl.active{border-color:var(--acc);background:#101a2b}
+  .tpl .tname{font-size:13px;font-weight:600}
+  .tpl .tdesc{font-size:12px;color:var(--dim);margin-top:2px}
+  .tpl .ttag{display:inline-block;font-size:10px;font-family:var(--mono);padding:1px 6px;border-radius:4px;margin-top:5px}
+  .ttag.ok{color:var(--ok);background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.35)}
+  .ttag.exp{color:var(--war);background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.35)}
+  .ttag.diy{color:var(--acc);background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.35)}
+  .note{font:11px var(--mono);color:var(--dim);margin-top:10px;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot">●</span> kev console <span data-i18n="hdrSub" style="color:var(--dim);font-weight:400">· decision model test (Jev-style)</span></h1>
+  <span class="badge" id="miscBadge">…</span>
+  <div class="lang">
+    <button id="langEn">EN</button>
+    <button id="langZh" class="on">中文</button>
+  </div>
+</header>
+<div class="main">
+  <!-- TEMPLATES -->
+  <section class="panel">
+    <h2><span data-i18n="secTemplates">Templates</span><span class="hint" data-i18n="secTemplatesHint">点卡片直接体验，无需自己设计问题</span></h2>
+    <div id="gallery"></div>
+    <div class="note" id="noteTpl"></div>
+  </section>
+
+  <!-- REQUEST BUILDER -->
+  <section class="panel">
+    <h2><span data-i18n="secRequest">Request</span> · <span data-i18n="secRequestPath">POST /v1/systemone</span></h2>
+    <label data-i18n="lblState">state（JSON 对象 或 纯文本）</label>
+    <textarea id="state" rows="6" spellcheck="false"></textarea>
+
+    <label data-i18n="lblQuestions">questions</label>
+    <div id="questions"></div>
+    <button class="btn ghost" id="addQ">+ <span data-i18n="addQuestion">添加问题</span></button>
+
+    <div class="toolbar">
+      <button class="btn" id="run">▶ <span data-i18n="run">Run inference</span></button>
+      <span class="status" id="status"></span>
+    </div>
+    <div id="running" data-i18n="running">推理中（CPU，约 1–2s）…</div>
+  </section>
+
+  <!-- RESPONSE -->
+  <section class="panel">
+    <h2><span data-i18n="secResponse">Response</span></h2>
+    <div id="resp"><div class="status" id="respEmpty"></div></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+
+const I18N = {
+  zh: {
+    hdrSub: "· 决策模型测试（Jev 风格，一个 forward pass 出概率）",
+    secTemplates: "场景模板", secTemplatesHint: "点卡片直接体验，无需自己设计问题",
+    secRequest: "请求", secRequestPath: "POST /v1/systemone",
+    secResponse: "结果",
+    lblState: "state（JSON 对象 或 纯文本）",
+    lblQuestions: "questions",
+    addQuestion: "+ 添加问题",
+    run: "运行推理",
+    running: "推理中（CPU，约 1–2s）…",
+    emptyResp: "点击上方模板或手动填写请求，然后点「运行推理」。",
+    idPh: "问题 id（如 respond）",
+    instrPh: "instructions（指令）",
+    chType: (v) => ({choice:"choice（多选）", noul:"noul（是非）", score:"score（打分）"})[v],
+    removeTitle: "删除该问题",
+    noulTruePh: "「是」描述（可选）",
+    noulFalsePh: "「否」描述（可选）",
+    critChoicePh: "每行一个选项：key: 描述（无冒号则视为无描述）",
+    critScorePh: "每行一个级别（从低到高）",
+    stateEmpty: "state 为空",
+    stateBadJSON: "state 不是合法 JSON，请检查格式",
+    dupId: "重复的 question id：",
+    noQuestions: "至少一个问题",
+    tooManyOpts: "选项过多",
+    needChoice: "至少 1 个选项",
+    needScore: "score 至少 2 个级别",
+    running_ok: "完成 ✓",
+    httpErr: "HTTP ",
+    netErr: "error：",
+    env_loading: "加载 /v1/models…",
+    env_offline: "API 未连接",
+    topline: (m, s, c, i, o) => `model ${m}${s ? "  ·  server " + s + " ms" : ""}  ·  client ${c} ms${i ? "  ·  in " + i + " tok / out " + o + " tok" : ""}`,
+    tagTrained: "训练域（推荐）",
+    tagExp: "实验（超出训练域）",
+    diyName: "自定义（自己动手）",
+    diyDesc: "自己写 state 和 questions，从零体验这套工作流",
+    diyReady: "自定义模式 — 修改 state 与问题后点「运行推理」",
+    noteTpl: "标注「训练域」的模板取自模型实际训练的数据分布（银行、新闻、NLI、点评、情绪），效果最稳；「实验」模板是日常玩法，概率仅供参考。",
+    tplTip: "推理技巧：模型只根据你写进 state 的事实做一次判断，不做常识推理——事实写明确（如“确定会错过”“无替代线路”），一个大决定拆成几个小选择题/是非题，答案会可靠很多。",
+    ldrTopic: "模板提供中英文版本：kev-0.5b 为英文训练，英文版精度更佳；中文版输入已在当前模型上实测可用，结果仅供参考。",
+  },
+  en: {
+    hdrSub: "· decision model test (Jev-style)",
+    secTemplates: "Templates", secTemplatesHint: "click a card to try — no prompting needed",
+    secRequest: "Request", secRequestPath: "POST /v1/systemone",
+    secResponse: "Response",
+    lblState: "state (JSON object or plain text)",
+    lblQuestions: "questions",
+    addQuestion: "+ Add question",
+    run: "Run inference",
+    running: "inference running (CPU, ~1–2s)…",
+    emptyResp: "Pick a template above, or craft a request manually, then hit “Run inference”.",
+    idPh: "question id (e.g. respond)",
+    instrPh: "instructions",
+    chType: (v) => ({choice:"choice", noul:"noul (yes/no)", score:"score"})[v],
+    removeTitle: "remove question",
+    noulTruePh: "description of “true” (optional)",
+    noulFalsePh: "description of “false” (optional)",
+    critChoicePh: "one option per line: key: description (no colon = no description)",
+    critScorePh: "one level per line (low → high)",
+    stateEmpty: "state is empty",
+    stateBadJSON: "state is not valid JSON — check formatting",
+    dupId: "duplicate question id: ",
+    noQuestions: "at least one question is required",
+    tooManyOpts: "too many options",
+    needChoice: "need at least 1 option",
+    needScore: "score needs at least 2 levels",
+    running_ok: "done ✓",
+    httpErr: "HTTP ",
+    netErr: "error: ",
+    env_loading: "loading /v1/models…",
+    env_offline: "API offline",
+    topline: (m, s, c, i, o) => `model ${m}${s ? "  ·  server " + s + " ms" : ""}  ·  client ${c} ms${i ? "  ·  in " + i + " tok / out " + o + " tok" : ""}`,
+    tagTrained: "in-domain (most reliable)",
+    tagExp: "experimental (out of domain)",
+    diyName: "Custom (do it yourself)",
+    diyDesc: "Write your own state & questions from scratch",
+    diyReady: "Custom mode — edit the state & questions, then run inference",
+    noteTpl: "“in-domain” templates match the model's training distribution (banking, news, NLI, reviews, sentiment) and behave best; “experimental” ones are daily-life fun — treat probabilities as indicative only.",
+    tplTip: "Trick for better results: kev makes a single decision from the facts in the state — no commonsense reasoning. State clear facts (e.g. “will definitely miss”, “no alternative route”) and split one big decision into several choice/yes-no questions.",
+    ldrTopic: "Templates ship in both languages; kev-0.5b is English-trained, so the English variants are more accurate. Chinese variants are verified to run on this model.",
+  },
+};
+
+let lang = "zh";
+const t = (k) => I18N[lang][k] ?? k;
+const tfn = (k, args) => typeof I18N[lang][k] === "function" ? I18N[lang][k](args) : t(k);
+
+const MAX_OPTIONS = 255;
+
+/* ---------- templates ---------- */
+const TEMPLATES = [
+  {
+    id: "estate-visit-intent", tag: "exp",
+    name: { zh: "楼盘浏览行为 → 购房意向", en: "Estate visit behavior → buying intent" },
+    desc: { zh: "用户在楼盘页看了户型、折扣，多次回访还没留资——判断意向，决定要不要立即电访。", en: "User browsed floorplans & discounts, returned repeatedly — gauge intent and decide on an immediate call." },
+    state: {
+      pages_visited: ["home", "floorplans", "discounts"],
+      visits: 3, avg_dwell_s: 240, returned_visits: true,
+      saved_unit: "A2 three-bedroom", booked_showing: false,
+    },
+    state_zh: {
+      访问页面: ["首页", "户型", "折扣活动"], 访问次数: 3, 平均停留秒数: 240, 二次回访: true,
+      收藏房源: "A2 三居室", 已预约看房: false,
+    },
+    questions: [
+      { id: "intent", type: "choice", instructions: "How strong is this visitor's buying intent?",
+        criteria: ["high_intent: Active buyer with clear signals", "nurture: Interested browser, needs warming", "research: Academic or competitor browsing"] },
+      { id: "call", type: "noul", instructions: "Should sales call this lead immediately?", criteria: ["", ""] },
+      { id: "lead_score", type: "score", instructions: "How valuable is this lead?", criteria: ["Watch", "Warm", "Hot", "Best"] },
+    ],
+    zh_questions: [
+      { id: "intent", type: "choice", instructions: "这位访问者的购房意向有多强？",
+        criteria: ["高意向: 信号明确，近期会买", "潜在线索: 有兴趣，需要培育", "在调研: 学术或同业调研"] },
+      { id: "call", type: "noul", instructions: "需要立即电话回访吗？", criteria: ["", ""] },
+      { id: "lead_score", type: "score", instructions: "这条线索价值多高？", criteria: ["观望", "潜力", "高意向", "准客户"] },
+    ],
+  },
+  {
+    id: "estate-unit-need", tag: "exp",
+    name: { zh: "户型查看行为 → 购房需求", en: "Floorplan views → home-buying needs" },
+    desc: { zh: "看了哪些户型、样板间，重点关注多大面积——预测他真正需要的户型与预算段。", en: "Which units and samples they viewed and the target area — predict the real floorplan need and budget range." },
+    state: { units_viewed: ["2BHK", "3BHK"], focus_area: "~95 sqm", viewed_sample: true, asked_balcony: true },
+    state_zh: { 查看户型: ["两居", "三居"], 重点关注面积: "约95平", 看过样板间: true, 咨询过阳台: true },
+    questions: [
+      { id: "prefer", type: "choice", instructions: "Which unit type does this buyer most likely need?",
+        criteria: ["compact_2b: 70–90 sqm compact two-bed", "comfy_3b: 90–110 sqm three-bed", "spacious_4b: 120+ sqm upgrade four-bed"] },
+      { id: "financing", type: "noul", instructions: "Does the buyer need mortgage or installment advice?", criteria: ["", ""] },
+      { id: "budget", type: "score", instructions: "How sensitive is the budget?", criteria: ["Low", "Medium", "High"] },
+    ],
+    zh_questions: [
+      { id: "prefer", type: "choice", instructions: "这位买家最可能需要哪种户型？",
+        criteria: ["紧凑两居: 70–90平 两居", "舒适三居: 90–110平 三居", "宽敞四房: 120平以上 改善"] },
+      { id: "financing", type: "noul", instructions: "需要贷款或分期方案咨询吗？", criteria: ["", ""] },
+      { id: "budget", type: "score", instructions: "这位买家对预算有多敏感？", criteria: ["低", "中", "高"] },
+    ],
+  },
+  {
+    id: "estate-discount", tag: "exp",
+    name: { zh: "折扣活动页行为 → 价格敏感度", en: "Discount page → price sensitivity" },
+    desc: { zh: "看了「限时95折」和车位促销、收藏优惠券、连回两天却没预约——判断成交窗口与跟进优先级。", en: "Promo page + coupon saved + return visits but no booking — gauge the close window and follow-up priority." },
+    state: "Viewed the limited-time 5% off promo page and a parking-space deal, saved the coupon, returned two days in a row, but has not booked a site visit.",
+    state_zh: "用户查看了「限时95折」活动页和车位促销，收藏了优惠券，连续两天回访，但还没有预约看房。",
+    questions: [
+      { id: "price_style", type: "choice", instructions: "How price-sensitive is this user?",
+        criteria: ["deal_hunter: Price-first, hunts discounts", "comparer: Will shop around a lot", "premium: Cares more about the product"] },
+      { id: "deal_ready", type: "noul", instructions: "Could this user close within a short window?", criteria: ["", ""] },
+      { id: "priority", type: "score", instructions: "Follow-up priority?", criteria: ["Low", "Medium", "High"] },
+    ],
+    zh_questions: [
+      { id: "price_style", type: "choice", instructions: "这位用户对价格有多敏感？",
+        criteria: ["优惠导向: 只看低总价和折扣", "货比三家: 会多方比较再决定", "产品导向: 更看重产品本身"] },
+      { id: "deal_ready", type: "noul", instructions: "短期内成交的可能性大吗？", criteria: ["", ""] },
+      { id: "priority", type: "score", instructions: "跟进优先级多高？", criteria: ["低", "中", "高"] },
+    ],
+  },
+  {
+    id: "estate-lead-routing", tag: "exp",
+    name: { zh: "看房预约留资 → 线索路由", en: "Site-visit booking → lead routing" },
+    desc: { zh: "已预约看房但还没分配顾问——根据家庭结构与关注点决定派给谁、多快联系。", en: "Showing booked but no advisor assigned yet — route by family profile and priorities, set contact speed." },
+    state: { booked_showing: true, has_phone: true, family: "2 adults + 1 kid", preferred_time: "Saturday morning", notes: "cares about schools and parking" },
+    state_zh: { 已预约看房: true, 已留电话: true, 家庭成员: "2大人+1小孩", 偏好时间: "周六上午", 备注: "关注学校与车位" },
+    questions: [
+      { id: "route", type: "choice", instructions: "Who should handle this lead?",
+        criteria: ["advisor_a: Specializes in upgrade / family buyers", "advisor_b: Specializes in first-time buyers", "weekend_desk: Weekend duty staff"] },
+      { id: "call", type: "noul", instructions: "Should be contacted within 2 hours?", criteria: ["", ""] },
+      { id: "quality", type: "score", instructions: "Lead quality?", criteria: ["Low", "Medium", "High"] },
+    ],
+    zh_questions: [
+      { id: "route", type: "choice", instructions: "这条线索应该分配给谁？",
+        criteria: ["顾问A: 擅长改善型家庭置业", "顾问B: 擅长刚需首次置业", "周末值班: 周末值守人员"] },
+      { id: "call", type: "noul", instructions: "需要在 2 小时内联系吗？", criteria: ["", ""] },
+      { id: "quality", type: "score", instructions: "线索质量如何？", criteria: ["低", "中", "高"] },
+    ],
+  },
+  {
+    id: "structured-state", tag: "ok",
+    name: { zh: "机器人结构化状态", en: "Robot · structured state" },
+    desc: { zh: "结构化对象作为输入，模拟机器人判断“要不要把杯子递过去”。", en: "A structured object state → decide whether the robot should hand over the cup." },
+    state: { user_present: true, distance: "near", object_detected: "cup", hand_moving: true },
+    state_zh: { 用户在场: true, 距离: "近", 检测到物体: "杯子", 手在移动: true },
+    questions: [
+      { id: "respond", type: "choice", instructions: "How should the assistant react?",
+        criteria: ["hand_over: Pass the cup to the user", "wait: Do nothing yet", "move_tray: Move the tray closer"] },
+      { id: "reachable", type: "noul", instructions: "Is the object within reach of the user?", criteria: ["", ""] },
+      { id: "urgency", type: "score", instructions: "How immediate is the needed action?", criteria: ["Calm", "Attentive", "Now"] },
+    ],
+    zh_questions: [
+      { id: "respond", type: "choice", instructions: "助手应该怎么做？",
+        criteria: ["递杯子: 把杯子递给用户", "等待: 暂时不做动作", "移近托盘: 把托盘移近"] },
+      { id: "reachable", type: "noul", instructions: "物体在用户伸手可及的范围内吗？", criteria: ["", ""] },
+      { id: "urgency", type: "score", instructions: "需要多快采取行动？", criteria: ["冷静", "专注", "立刻"] },
+    ],
+  },
+  {
+    id: "support-ticket", tag: "ok",
+    name: { zh: "客服工单分诊", en: "Support ticket triage" },
+    desc: { zh: "把一张真实工单路由到部门、判断是否升级、情绪有多糟。", en: "Route a ticket to the right team, decide escalation, gauge frustration." },
+    state: "Shoes arrived two weeks late and in the wrong size. Also I see two charges on my card.",
+    state_zh: "鞋子晚了两周才到，而且尺码不对。另外我的卡上出现了两笔扣款。",
+    questions: [
+      { id: "department", type: "choice", instructions: "Which team should handle this?",
+        criteria: ["returns: Exchanges, refunds, wrong or damaged items", "shipping: Delivery status, delays, lost packages", "billing: Charges, invoices, payment problems"] },
+      { id: "escalate", type: "noul", instructions: "Does this need urgent human attention?", criteria: ["", ""] },
+      { id: "frustration", type: "score", instructions: "How frustrated is the customer?", criteria: ["Calm", "Frustrated", "Very angry"] },
+    ],
+    zh_questions: [
+      { id: "department", type: "choice", instructions: "应该由哪个团队处理？",
+        criteria: ["退货: 换货、退款、错发或破损商品", "物流: 配送状态、延误、丢件", "账单: 扣款、发票、支付问题"] },
+      { id: "escalate", type: "noul", instructions: "这笔单子需要人工紧急处理吗？", criteria: ["", ""] },
+      { id: "frustration", type: "score", instructions: "客户的愤怒程度？", criteria: ["平静", "不满", "非常生气"] },
+    ],
+  },
+  {
+    id: "banking-intent", tag: "ok",
+    name: { zh: "银行客服意图", en: "Banking intent detection" },
+    desc: { zh: "识别一句银行客服消息的真实意图，并判断要不要立刻行动。", en: "Detect the real intent behind a banking message, plus immediate-action triage." },
+    state: "I just noticed two withdrawals from my account that I did not make. Please block my card.",
+    state_zh: "我刚刚发现账户里有两笔不是我操作的取款，请冻结我的卡。",
+    questions: [
+      { id: "intent", type: "choice", instructions: "What does the customer need?",
+        criteria: ["report_fraud: Unusual or unauthorized transactions", "block_card: Freeze the card", "check_balance: Balance inquiry", "dispute_transaction: Contest a specific charge", "update_contact: Change contact details", "card_lost: Lost or stolen card"] },
+      { id: "urgent", type: "noul", instructions: "Does this need immediate action?", criteria: ["", ""] },
+      { id: "severity", type: "score", instructions: "How severe is the case?", criteria: ["Low", "Medium", "High"] },
+    ],
+    zh_questions: [
+      { id: "intent", type: "choice", instructions: "客户需要什么？",
+        criteria: ["举报盗刷: 异常或未授权交易", "冻结卡片: 冻结银行卡", "查询余额: 查询账户余额", "争议交易: 对某笔扣款提出异议", "更新联系方式: 修改联系方式", "卡片丢失: 卡片遗失或被盗"] },
+      { id: "urgent", type: "noul", instructions: "这次需要立刻处理吗？", criteria: ["", ""] },
+      { id: "severity", type: "score", instructions: "事态的严重程度？", criteria: ["低", "中", "高"] },
+    ],
+  },
+  {
+    id: "review-rating", tag: "ok",
+    name: { zh: "点评打分与推荐", en: "Review rating & recommend" },
+    desc: { zh: "给一段餐厅点评打分、预测是否推荐，并判断情绪。", en: "Score a restaurant review, predict whether it's recommended, catch sentiment." },
+    state: "The burger was juicy and the fries were crispy, but the waiter forgot our drinks and the table was sticky. Overall decent value for the price.",
+    state_zh: "汉堡很多汁，薯条很脆，但服务员忘了我们的饮料，桌子还有点黏。总的来说性价比还行。",
+    questions: [
+      { id: "rating", type: "score", instructions: "How many stars does the customer give?", criteria: ["Terrible", "Poor", "Okay", "Good", "Great"] },
+      { id: "recommend", type: "noul", instructions: "Would the customer recommend this place?", criteria: ["", ""] },
+      { id: "sentiment", type: "choice", instructions: "What is the overall sentiment?",
+        criteria: ["positive", "neutral", "negative"] },
+    ],
+    zh_questions: [
+      { id: "rating", type: "score", instructions: "顾客给了几颗星？", criteria: ["很差", "较差", "一般", "好", "很好"] },
+      { id: "recommend", type: "noul", instructions: "顾客会推荐这家店吗？", criteria: ["", ""] },
+      { id: "sentiment", type: "choice", instructions: "整体情绪是什么？", criteria: ["正面的", "中性的", "负面的"] },
+    ],
+  },
+  {
+    id: "news-topic", tag: "ok",
+    name: { zh: "新闻话题分类", en: "News topic classification" },
+    desc: { zh: "一条财经快讯——判断话题、是否涉及金融、语气多积极。", en: "A market snippet — topic, finance relevance, tone." },
+    state: "Asian shares rose on Friday after Wall Street rallied overnight and chipmakers led gains on strong earnings reports.",
+    state_zh: "由于华尔街隔夜反弹，亚洲股市周五上涨，芯片股在强劲财报带动下领涨。",
+    questions: [
+      { id: "topic", type: "choice", instructions: "What is the article about?",
+        criteria: ["World", "Sports", "Business", "Science"] },
+      { id: "markets", type: "noul", instructions: "Is this about financial markets?", criteria: ["", ""] },
+      { id: "tone", type: "score", instructions: "How positive is the tone?", criteria: ["Negative", "Neutral", "Positive"] },
+    ],
+    zh_questions: [
+      { id: "topic", type: "choice", instructions: "这篇报道是关于什么的？", criteria: ["国际", "体育", "商业", "科技"] },
+      { id: "markets", type: "noul", instructions: "这是关于金融市场的新闻吗？", criteria: ["", ""] },
+      { id: "tone", type: "score", instructions: "语气有多积极？", criteria: ["偏负", "中性", "偏正"] },
+    ],
+  },
+  {
+    id: "reading-check", tag: "ok",
+    name: { zh: "信息核对（阅读理解）", en: "Fact-check · reading comprehension" },
+    desc: { zh: "一段公司简介（BoolQ 风格疑问句），核对事实并给出把握度。", en: "A company blurb (BoolQ-style yes/no) + a confidence rating." },
+    state: "The company was founded in 1998 by two engineers. It opened its first public store in Seattle in 2002. It listed on the NASDAQ in 2004 and has never paid a dividend. In 2010 it expanded to Europe and by 2020 it operated more than three hundred stores worldwide.",
+    state_zh: "这家公司1998年由两位工程师创立。2002年在西雅图开出第一家门店。2004年在纳斯达克上市，从未分红。2010年进军欧洲，到2020年在全球经营超过三百家门店。",
+    questions: [
+      { id: "is_public", type: "noul", instructions: "Was the company listed on a public stock exchange?", criteria: ["", ""] },
+      { id: "ever_dividend", type: "noul", instructions: "Has the company ever paid a dividend?", criteria: ["", ""] },
+      { id: "confidence", type: "score", instructions: "How certain are these conclusions?", criteria: ["Guess", "Unsure", "Confident"] },
+    ],
+    zh_questions: [
+      { id: "is_public", type: "noul", instructions: "这家公司曾在公开证券交易所上市吗？", criteria: ["", ""] },
+      { id: "ever_dividend", type: "noul", instructions: "这家公司曾经分红过吗？", criteria: ["", ""] },
+      { id: "confidence", type: "score", instructions: "你对结论有多大把握？", criteria: ["猜的", "不太确定", "很有把握"] },
+    ],
+  },
+  {
+    id: "inbox-triage", tag: "exp",
+    name: { zh: "邮件收件箱处置", en: "Inbox triage" },
+    desc: { zh: "一封四点的协作邮件——该回复/转发/归档，有多急、多重要。", en: "An end-of-week email — reply, forward or archive? How urgent, how important?" },
+    state: "Hi team, please find the attached draft for the Q3 launch. The CEO wants comments by Friday EOD and a final version on Monday.",
+    state_zh: "大家好，附件是Q3发布会的初稿。CEO希望在周五下班前收到意见，周一给出最终版。",
+    questions: [
+      { id: "action", type: "choice", instructions: "What should the recipient do?",
+        criteria: ["reply: Send a short reply", "review: Read and leave comments", "forward: Forward to someone", "delegate: Assign to a teammate", "archive: No action needed"] },
+      { id: "urgent", type: "noul", instructions: "Does this need attention before Friday?", criteria: ["", ""] },
+      { id: "importance", type: "score", instructions: "How important is this message?", criteria: ["Low", "Normal", "High"] },
+    ],
+    zh_questions: [
+      { id: "action", type: "choice", instructions: "收件人应该做什么？",
+        criteria: ["回复: 发一封简短回复", "审阅: 阅读并留言", "转发: 转给某人", "归档: 无需处理", "分派: 指派给同事"] },
+      { id: "urgent", type: "noul", instructions: "周五之前需要处理吗？", criteria: ["", ""] },
+      { id: "importance", type: "score", instructions: "这封邮件有多重要？", criteria: ["低", "普通", "高"] },
+    ],
+  },
+  {
+    id: "marketplace-dispute", tag: "exp",
+    name: { zh: "二手交易纠纷", en: "Marketplace dispute" },
+    desc: { zh: "买卖双方各执一词，判断最合理的处理方案与责任方。", en: "Buyer and seller disagree — pick a fair resolution and who's at fault." },
+    state: "The buyer says the headphones arrived with a broken left earpiece and wants a full refund. The seller claims the item was packed carefully and suspects shipping damage.",
+    state_zh: "买家说耳机到货时左耳已经坏了，要求全额退款。卖家声称包装很仔细，怀疑是运输损坏。",
+    questions: [
+      { id: "resolution", type: "choice", instructions: "What is the fairest resolution?",
+        criteria: ["full_refund: Refund the full amount", "partial_refund: Refund part of the price", "replace_item: Send a replacement", "ask_evidence: Request photos or proof", "neutral: No action yet"] },
+      { id: "buyer_at_fault", type: "noul", instructions: "Is the buyer likely responsible?", criteria: ["", ""] },
+      { id: "severity", type: "score", instructions: "How severe is this dispute?", criteria: ["Mild", "Moderate", "Severe"] },
+    ],
+    zh_questions: [
+      { id: "resolution", type: "choice", instructions: "最合理的处理方案是？",
+        criteria: ["全额退款: 退全款", "部分退款: 退一部分钱", "换货: 重新寄一个", "要求证据: 请提供照片或证明", "暂不处理: 先不处理"] },
+      { id: "buyer_at_fault", type: "noul", instructions: "买家很可能有责任吗？", criteria: ["", ""] },
+      { id: "severity", type: "score", instructions: "纠纷有多严重？", criteria: ["轻微", "中等", "严重"] },
+    ],
+  },
+  {
+    id: "health-triage", tag: "exp",
+    name: { zh: "健康症状分诊", en: "Health symptom triage" },
+    desc: { zh: "家庭症状描述——走居家护理、去药店还是就医？（仅供参考）", en: "A family symptom note — home care, pharmacy or clinic? (indicative only.)" },
+    state: "My 6-year-old has had a mild fever and a cough for two days, is eating and drinking normally, and complains of a sore throat but is still playing.",
+    state_zh: "我6岁的孩子低烧咳嗽两天了，吃喝正常，喉咙疼但还在玩。",
+    questions: [
+      { id: "action", type: "choice", instructions: "What should be recommended?",
+        criteria: ["homecare: Monitor at home", "pharmacy: Over-the-counter advice", "clinic: Recommend a clinic visit", "emergency: Seek emergency care"] },
+      { id: "urgent", type: "noul", instructions: "Does this need emergency attention?", criteria: ["", ""] },
+      { id: "severity", type: "score", instructions: "How severe does this seem?", criteria: ["Minor", "Moderate", "Serious"] },
+    ],
+    zh_questions: [
+      { id: "action", type: "choice", instructions: "应该建议怎么做？",
+        criteria: ["居家护理: 在家观察", "药店咨询: 建议咨询药店", "去诊所: 建议去诊所", "急诊: 立即就医"] },
+      { id: "urgent", type: "noul", instructions: "需要紧急就医吗？", criteria: ["", ""] },
+      { id: "severity", type: "score", instructions: "症状有多严重？", criteria: ["轻微", "中等", "严重"] },
+    ],
+  },
+  {
+    id: "chat-intent", tag: "ok",
+    name: { zh: "智能客服实时意图", en: "Live chat intent" },
+    desc: { zh: "一句在线客服消息 → 意图 + 用户情绪 + 优先级。", en: "One live-chat line → intent, emotion and priority." },
+    state: "Hey, can you tell me if order #8821 already shipped? I ordered it last Tuesday and the tracking number is not working.",
+    state_zh: "你好，能帮我查一下订单8821发货了吗？我上周二下的单，物流单号查不到。",
+    questions: [
+      { id: "intent", type: "choice", instructions: "What does the user want?",
+        criteria: ["track_order: Where is my order", "cancel_order: Cancel the order", "return_item: Send it back", "payment_issue: Billing or payment problem", "human_agent: Talk to a person"] },
+      { id: "frustrated", type: "noul", instructions: "Is the user frustrated?", criteria: ["", ""] },
+      { id: "priority", type: "score", instructions: "How high is the priority?", criteria: ["Low", "Normal", "High"] },
+    ],
+    zh_questions: [
+      { id: "intent", type: "choice", instructions: "用户想要什么？",
+        criteria: ["查订单: 我的订单到哪了", "取消订单: 取消这个订单", "退货: 退回商品", "支付问题: 账单或支付问题", "转人工: 找真人客服"] },
+      { id: "frustrated", type: "noul", instructions: "这位用户感到烦躁吗？", criteria: ["", ""] },
+      { id: "priority", type: "score", instructions: "优先级有多高？", criteria: ["低", "普通", "高"] },
+    ],
+  },
+];
+
+/* ---------- state ---------- */
+const Q = document.getElementById("questions");
+let metas = [];
+let currentTplId = null;
+
+const STARTER = {
+  en: {
+    state: "My train is delayed by 20 minutes and I will miss my connection to the coast, but a later train still gets me there tonight.",
+    questions: [
+      { id: "suggest", type: "choice", instructions: "What is the most reliable action?",
+        criteria: ["rebook_next: Book the next train to the coast", "wait_platform: Stay on the platform and wait", "contact_staff: Ask station staff for help"] },
+      { id: "risk", type: "noul", instructions: "Is it risky to just wait on the platform?", criteria: ["", ""] },
+    ],
+  },
+  zh: {
+    state: "我的火车延误了20分钟，我会错过转乘去海边的车，而且没有其他直达线路。",
+    questions: [
+      { id: "suggest", type: "choice", instructions: "最稳妥的建议是什么？",
+        criteria: ["改签下一班: 预订到海边的下一班列车", "原地等待: 在站台等待", "找工作人员: 求助车站工作人员"] },
+      { id: "risk", type: "noul", instructions: "只在站台干等是有风险的做法吗？", criteria: ["", ""] },
+    ],
+  },
+};
+
+function startCustom() {
+  currentTplId = null;
+  const s = STARTER[lang] || STARTER.en;
+  document.getElementById("state").value = s.state;
+  metas = s.questions.map(q => ({ id: q.id, type: q.type, instructions: q.instructions, criteria: [...q.criteria] }));
+  renderQuestions();
+  [...document.querySelectorAll(".tpl")].forEach(c => c.classList.toggle("active", c.dataset.tpl === "DIY"));
+  const status = document.getElementById("status");
+  status.className = "status ok"; status.textContent = t("diyReady");
+  if (window.innerWidth < 820) document.querySelector(".main .panel:nth-child(2)").scrollIntoView({ behavior: "smooth", block: "start" });
+  else document.getElementById("state").focus();
+}
+
+function tplStateOf(tpl) {
+  return lang === "zh" ? (tpl.state_zh ?? tpl.state) : tpl.state;
+}
+function tplQuestionsOf(tpl) {
+  return lang === "zh" ? (tpl.zh_questions ?? tpl.questions) : tpl.questions;
+}
+function tplStateText(tpl) {
+  const s = tplStateOf(tpl);
+  return typeof s === "string" ? s : JSON.stringify(s, null, 2);
+}
+function pristineState(tpl) {
+  return document.getElementById("state").value === tplStateText(tpl);
+}
+function pristineMetas(tpl) {
+  const a = metas, b = tplQuestionsOf(tpl);
+  if (a.length !== b.length) return false;
+  return a.every((m, i) => m.id === b[i].id && m.type === b[i].type && m.instructions === b[i].instructions &&
+    JSON.stringify(m.criteria || null) === JSON.stringify(b[i].criteria || null));
+}
+
+function loadTemplate(tpl) {
+  currentTplId = tpl.id;
+  document.getElementById("state").value = tplStateText(tpl);
+  metas = tplQuestionsOf(tpl).map(q => ({ id: q.id, type: q.type, instructions: q.instructions, criteria: [...q.criteria] }));
+  renderQuestions();
+  [...document.querySelectorAll(".tpl")].forEach(c => c.classList.toggle("active", c.dataset.tpl === tpl.id));
+  if (window.innerWidth < 820) document.querySelector(".main .panel:nth-child(2)").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderCriteria(meta) {
+  const wrap = document.createElement("div");
+  if (meta.type === "noul") {
+    const mk = (ph) => {
+      const r = document.createElement("div"); r.className = "row";
+      const inp = document.createElement("input");
+      inp.placeholder = ph;
+      inp.value = meta.criteria[wrap.children.length] || "";
+      inp.addEventListener("input", e => meta.criteria[wrap.children.length] = e.target.value);
+      r.appendChild(inp); wrap.appendChild(r);
+    };
+    mk(t("noulTruePh")); mk(t("noulFalsePh"));
+  } else {
+    const ta = document.createElement("textarea");
+    ta.rows = Math.min(6, (meta.criteria.length || 3) + 1);
+    ta.placeholder = meta.type === "choice" ? t("critChoicePh") : t("critScorePh");
+    ta.value = meta.criteria.join("\n");
+    ta.addEventListener("input", e => {
+      meta.criteria = e.target.value.split("\n").filter(l => l.trim() !== "" || meta.type === "score");
+    });
+    wrap.appendChild(ta);
+  }
+  return wrap;
+}
+
+function renderQuestions() {
+  Q.innerHTML = "";
+  metas.forEach(meta => Q.appendChild(makeQuestionCard(meta)));
+}
+
+function makeQuestionCard(meta) {
+  const card = document.createElement("div"); card.className = "qcard";
+  const head = document.createElement("div"); head.className = "qhead";
+  const idIn = document.createElement("input"); idIn.value = meta.id; idIn.placeholder = t("idPh");
+  idIn.addEventListener("input", e => meta.id = e.target.value.replace(/\s+/g, "_"));
+  const type = document.createElement("select");
+  ["choice", "noul", "score"].forEach(tv => {
+    const o = document.createElement("option"); o.value = tv; o.text = tfn("chType", tv);
+    type.appendChild(o);
+  });
+  type.value = meta.type;
+  const remove = document.createElement("button"); remove.className = "btn danger"; remove.textContent = "✕"; remove.title = t("removeTitle");
+  head.append(idIn, type, remove);
+  card.appendChild(head);
+
+  const instr = document.createElement("input");
+  instr.value = meta.instructions; instr.placeholder = t("instrPh");
+  instr.addEventListener("input", e => meta.instructions = e.target.value);
+  card.appendChild(instr);
+
+  let critWrap = renderCriteria(meta);
+  const swap = () => { critWrap.remove(); critWrap = renderCriteria(meta); card.appendChild(critWrap); };
+  type.addEventListener("change", () => { meta.type = type.value; swap(); });
+  remove.addEventListener("click", () => { metas = metas.filter(m => m !== meta); card.remove(); });
+  card.appendChild(critWrap);
+  return card;
+}
+
+function addQuestion() {
+  const meta = { id: "q" + (metas.length + 1), type: "choice", instructions: "", criteria: ["option_a", "option_b"] };
+  metas.push(meta);
+  Q.appendChild(makeQuestionCard(meta));
+}
+document.getElementById("addQ").addEventListener("click", addQuestion);
+
+function renderGallery() {
+  const g = document.getElementById("gallery");
+  g.innerHTML = "";
+
+  const diy = document.createElement("div"); diy.className = "tpl" + (currentTplId ? "" : " active"); diy.dataset.tpl = "DIY";
+  const diyTag = document.createElement("span"); diyTag.className = "ttag diy"; diyTag.textContent = "✎";
+  const diyName = document.createElement("div"); diyName.className = "tname"; diyName.textContent = t("diyName");
+  const diyDesc = document.createElement("div"); diyDesc.className = "tdesc"; diyDesc.textContent = t("diyDesc");
+  diy.append(diyTag, diyName, diyDesc);
+  diy.addEventListener("click", startCustom);
+  g.appendChild(diy);
+
+  TEMPLATES.forEach(tpl => {
+    const c = document.createElement("div"); c.className = "tpl"; c.dataset.tpl = tpl.id;
+    const tag = document.createElement("span"); tag.className = "ttag " + (tpl.tag === "ok" ? "ok" : "exp");
+    tag.textContent = tpl.tag === "ok" ? t("tagTrained") : t("tagExp");
+    const name = document.createElement("div"); name.className = "tname";
+    name.textContent = lang === "zh" ? tpl.name.zh + " · " + tpl.name.en : tpl.name.en;
+    const desc = document.createElement("div"); desc.className = "tdesc";
+    desc.textContent = lang === "zh" ? tpl.desc.zh : tpl.desc.en;
+    c.append(tag, name, desc);
+    c.addEventListener("click", () => loadTemplate(tpl));
+    g.appendChild(c);
+  });
+  document.getElementById("noteTpl").textContent = t("noteTpl") + " " + t("ldrTopic") + " " + t("tplTip");
+}
+
+/* ---------- request builder ---------- */
+function buildRequest() {
+  const raw = document.getElementById("state").value.trim();
+  let state;
+  if (raw === "") throw new Error(t("stateEmpty"));
+  if (raw[0] === "{" || raw[0] === "[") { try { state = JSON.parse(raw); } catch { throw new Error(t("stateBadJSON")); } }
+  else state = raw;
+  if (!state && state !== 0 && state !== "") throw new Error(t("stateBadJSON"));
+
+  const questions = {};
+  metas.forEach(meta => {
+    const id = meta.id || "q";
+    if (questions[id]) throw new Error(t("dupId") + id);
+    const q = { type: meta.type, instructions: meta.instructions };
+    if (meta.type === "choice") {
+      const criteria = {};
+      (meta.criteria || []).forEach(line => {
+        if (!line || !String(line).trim()) return;
+        const s = String(line);
+        const idx = s.indexOf(":");
+        const k = (idx >= 0 ? s.slice(0, idx) : s).trim();
+        const v = idx >= 0 ? s.slice(idx + 1).trim() : "";
+        if (!k) return;
+        if (Object.keys(criteria).length >= MAX_OPTIONS) throw new Error(t("tooManyOpts"));
+        criteria[k] = v || null;
+      });
+      if (Object.keys(criteria).length < 1) throw new Error(id + ": " + t("needChoice"));
+      q.criteria = criteria;
+    } else if (meta.type === "noul") {
+      const c = {};
+      if (meta.criteria[0]) c.true = meta.criteria[0];
+      if (meta.criteria[1]) c.false = meta.criteria[1];
+      q.criteria = Object.keys(c).length ? c : null;
+    } else {
+      const lv = (meta.criteria || []).filter(x => String(x).trim() !== "");
+      if (lv.length < 2) throw new Error(id + ": " + t("needScore"));
+      q.criteria = lv;
+    }
+    questions[id] = q;
+  });
+  if (Object.keys(questions).length === 0) throw new Error(t("noQuestions"));
+  return { state, model: "kev-latest", questions };
+}
+
+/* ---------- response ---------- */
+function el(tag, cls, txt) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (txt !== undefined) e.textContent = txt;
+  return e;
+}
+
+function probBars(probs, legend) {
+  const rows = [];
+  let max = 1;
+  Object.entries(probs).forEach(([, p]) => max = Math.max(max, p));
+  Object.entries(probs).forEach(([k, p]) => {
+    const name = legend ? legend[k] || k : k;
+    const r = document.createElement("div"); r.className = "bar";
+    r.append(el("span", "name", String(name).slice(0, 40)), el("span", "pct", (p * 100).toFixed(1) + "%"));
+    const track = el("div", "track");
+    const fill = el("div", "fill"); fill.style.width = (p / max * 100) + "%";
+    track.appendChild(fill);
+    r.insertBefore(track, r.lastChild);
+    rows.push(r);
+  });
+  return rows;
+}
+
+function renderAnswer(id, a) {
+  const card = el("div", "anscard");
+  card.appendChild(el("div", "id", "# " + id + "  ·  " + a.type));
+  Object.entries(a).forEach(([k, v]) => {
+    if (k === "type" || k === "probabilities") return;
+    const kv = el("div", "kv");
+    const b = document.createElement("b"); b.textContent = k;
+    kv.appendChild(b);
+    kv.appendChild(document.createTextNode("  " + JSON.stringify(v)));
+    card.appendChild(kv);
+  });
+  if (a.probabilities) probBars(a.probabilities, a.legend || null).forEach(x => card.appendChild(x));
+  return card;
+}
+
+document.getElementById("run").addEventListener("click", async () => {
+  const btn = document.getElementById("run");
+  const status = document.getElementById("status");
+  btn.disabled = true;
+  document.getElementById("running").style.display = "block";
+  status.className = "status"; status.textContent = "";
+  try {
+    const body = buildRequest();
+    const t0 = performance.now();
+    const res = await fetch("/v1/systemone", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    });
+    const wall = performance.now() - t0;
+    const data = await res.json();
+    if (!res.ok) {
+      status.className = "status err";
+      status.textContent = t("httpErr") + res.status + "：" + (data.detail ? JSON.stringify(data.detail).slice(0, 200) : "bad request");
+      return;
+    }
+    const out = document.getElementById("resp");
+    out.innerHTML = "";
+    out.appendChild(el("div", "topline",
+      I18N[lang].topline(data.model, data.latency_ms, wall.toFixed(0),
+        data.usage ? data.usage.input_tokens : null, data.usage ? data.usage.output_tokens : null)));
+    Object.entries(data.answers || {}).forEach(([id, a]) => out.appendChild(renderAnswer(id, a)));
+    status.className = "status ok"; status.textContent = t("running_ok");
+  } catch (e) {
+    status.className = "status err"; status.textContent = t("netErr") + e.message;
+  } finally {
+    document.getElementById("running").style.display = "none";
+    btn.disabled = false;
+  }
+});
+
+/* ---------- i18n ---------- */
+function applyLang() {
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  document.getElementById("langZh").classList.toggle("on", lang === "zh");
+  document.getElementById("langEn").classList.toggle("on", lang === "en");
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.getElementById("respEmpty").textContent = t("emptyResp");
+  renderGallery();
+  const tpl = currentTplId ? TEMPLATES.find(x => x.id === currentTplId) : null;
+  if (tpl && pristineState(tpl) && pristineMetas(tpl)) loadTemplate(tpl); else renderQuestions();
+  document.title = lang === "zh" ? "kev console — 决策模型测试台" : "kev console — decision model test";
+}
+document.getElementById("langEn").addEventListener("click", () => { lang = "en"; applyLang(); });
+document.getElementById("langZh").addEventListener("click", () => { lang = "zh"; applyLang(); });
+
+/* ---------- boot ---------- */
+(async () => {
+  const badge = document.getElementById("miscBadge");
+  badge.textContent = t("env_loading");
+  try {
+    const r = await fetch("/v1/models");
+    const d = await r.json();
+    badge.textContent = d.models[0] ? d.models[0].run + "  ·  " + d.models[0].base : "";
+  } catch (e) {
+    badge.textContent = t("env_offline");
+  }
+  applyLang();
+  loadTemplate(TEMPLATES[0]);
+})();
+</script>
+</body>
+</html>

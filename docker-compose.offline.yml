@@ -1,0 +1,7 @@
+# 离线快速构建覆盖层：本地已预下载 wheelhouse 时使用
+# 用法：docker compose -f docker-compose.yml -f docker-compose.offline.yml build && up -d
+services:
+  kev:
+    build:
+      args:
+        USE_WHEELHOUSE: "1"

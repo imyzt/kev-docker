@@ -1,0 +1,3 @@
+src/kev/__pycache__/
+**/__pycache__/
+wheelhouse/*.whl.zip

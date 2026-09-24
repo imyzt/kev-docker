@@ -1,0 +1,44 @@
+services:
+  # ---- kev 模型服务（CPU 推理 FastAPI）----
+  kev:
+    build:
+      context: ./server
+    container_name: kev-app
+    restart: unless-stopped
+    ports:
+      - "${KEV_PORT:-127.0.0.1:8009}:8009"
+    environment:
+      KEV_HOST: "0.0.0.0"
+      PYTHONPATH: "/opt/kev"
+      HF_HOME: "/hf-cache"
+      HF_HUB_OFFLINE: "1"
+      # 0.5B 小模型 + 多容器共享 CPU 的 VM：实测 1线程=3.5s / 4线程=31s / 8线程=68s，单线程最优
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-1}"
+      MKL_NUM_THREADS: "${OMP_NUM_THREADS:-1}"
+      TOKENIZERS_PARALLELISM: "false"
+    volumes:
+      # 代码（只读挂载，改动无需重建镜像）
+      - ./server/src:/opt/kev:ro
+      # 微调权重目录（adapter/head/tokenizer），放入 runs/kev/
+      - ./runs/kev:/app/runs/kev:ro
+      # 基础模型 HF 缓存，宿主机路径可用 .env 覆盖（HF_CACHE_DIR）
+      - "${HF_CACHE_DIR:-$HOME/.cache/huggingface}:/hf-cache:ro"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8009/v1/models', timeout=10)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # ---- kev 演示页面（nginx 静态站 + 反向代理）----
+  web:
+    image: nginx:alpine
+    container_name: kev-web
+    restart: unless-stopped
+    depends_on:
+      - kev
+    ports:
+      - "${WEB_PORT:-127.0.0.1:8083}:80"
+    volumes:
+      - ./web/www:/usr/share/nginx/html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
